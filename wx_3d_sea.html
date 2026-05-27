@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>3D 大気モデル | SE Asia</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #060b12; color: #e6edf3; font-family: -apple-system,'Hiragino Sans',sans-serif; overflow: hidden; touch-action: none; }
+canvas { display: block; }
+
+#loading {
+  position: fixed; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px;
+  background: #060b12; z-index: 200;
+}
+.spinner { width: 36px; height: 36px; border: 2px solid #1e3a5f; border-top-color: #58a6ff; border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.ld-title { font-size: 17px; font-weight: 700; letter-spacing: .06em; }
+.ld-msg { font-size: 12px; color: #8b949e; }
+
+#topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  background: rgba(6,11,18,.9); backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(48,54,61,.5);
+}
+.tb-title { font-size: 15px; font-weight: 700; }
+.tb-sub { font-size: 11px; color: #8b949e; margin-top: 1px; }
+.spacer { flex: 1; }
+.back-btn { font-size: 11px; color: #8b949e; background: rgba(255,255,255,.05); border: 1px solid rgba(48,54,61,.8); border-radius: 6px; padding: 5px 11px; text-decoration: none; white-space: nowrap; }
+
+#mode-panel {
+  position: fixed; top: 58px; left: 14px; z-index: 10;
+  display: flex; flex-direction: column; gap: 5px; min-width: 130px;
+}
+.panel-lbl { font-size: 10px; color: #8b949e; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 2px; }
+.mode-btn {
+  font-size: 12px; font-weight: 600; padding: 8px 12px; border-radius: 7px;
+  border: 1px solid rgba(48,54,61,.8); background: rgba(22,27,34,.92);
+  color: #8b949e; cursor: pointer; transition: all .18s; text-align: left;
+}
+.mode-btn.on-shear { background: rgba(251,143,68,.18); color: #fb8f44; border-color: rgba(251,143,68,.5); }
+.mode-btn.on-temp  { background: rgba(248,81,73,.18);  color: #f85149; border-color: rgba(248,81,73,.5); }
+.mode-btn.on-te    { background: rgba(63,185,80,.18);  color: #3fb950; border-color: rgba(63,185,80,.5); }
+
+.tropo-toggle {
+  font-size: 11px; padding: 6px 12px; border-radius: 7px; cursor: pointer;
+  border: 1px solid rgba(48,54,61,.8); background: rgba(22,27,34,.92); color: #8b949e;
+  margin-top: 2px; transition: all .18s;
+}
+.tropo-toggle.on { background: rgba(57,211,192,.15); color: #39d3c0; border-color: rgba(57,211,192,.4); }
+
+#view-panel {
+  position: fixed; top: 58px; right: 14px; z-index: 10;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.view-btn {
+  font-size: 11px; padding: 7px 13px; border-radius: 7px;
+  border: 1px solid rgba(48,54,61,.8); background: rgba(22,27,34,.92);
+  color: #8b949e; cursor: pointer; transition: all .15s;
+}
+.view-btn:hover { color: #e6edf3; border-color: #484f58; }
+
+#legend {
+  position: fixed; bottom: 16px; left: 14px; z-index: 10;
+  background: rgba(6,11,18,.9); backdrop-filter: blur(10px);
+  border: 1px solid rgba(48,54,61,.6); border-radius: 9px; padding: 10px 12px; min-width: 155px;
+}
+.leg-title { font-size: 10px; color: #8b949e; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 7px; }
+.leg-row { display: flex; align-items: center; gap: 7px; font-size: 11px; margin-bottom: 4px; }
+.leg-sw { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+
+#info {
+  position: fixed; bottom: 16px; right: 14px; z-index: 10;
+  background: rgba(6,11,18,.9); backdrop-filter: blur(10px);
+  border: 1px solid rgba(48,54,61,.6); border-radius: 9px; padding: 10px 12px;
+  font-size: 11px; color: #8b949e; line-height: 1.7;
+}
+.info-sub { font-size: 10px; color: #3fb950; margin-top: 5px; }
+#mesh-info { font-size: 10px; color: #484f58; margin-top: 4px; }
+
+.lbl { color: rgba(180,210,240,.75); font-size: 9px; font-family: monospace;
+  background: rgba(6,11,18,.55); padding: 1px 3px; border-radius: 2px;
+  pointer-events: none; white-space: nowrap; }
+.lbl-data { color: rgba(88,166,255,.90); font-size: 10px; font-weight: 600; }
+.fl-filter-btn {
+  font-size: 10px; padding: 3px 5px; border-radius: 4px; cursor: pointer;
+  border: 1px solid rgba(48,54,61,.8); background: rgba(22,27,34,.92);
+  color: #8b949e; transition: all .15s;
+}
+.fl-filter-btn.on { background: rgba(88,166,255,.25); color: #58a6ff; border-color: rgba(88,166,255,.5); }
+.albl { color: #58a6ff; font-size: 11px; font-weight: 700; font-family: monospace; pointer-events: none; }
+
+/* ── 断面図 ─────────────────────────────── */
+#x-panel {
+  position: fixed; inset: 0; z-index: 80;
+  background: #060b12; display: none; flex-direction: column;
+}
+#x-topbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 14px; flex-shrink: 0;
+  background: rgba(22,27,34,.96); border-bottom: 1px solid rgba(48,54,61,.5);
+}
+#x-title { font-size: 14px; font-weight: 700; white-space: nowrap; }
+.xc-btn {
+  font-size: 11px; padding: 5px 11px; border-radius: 6px; cursor: pointer;
+  border: 1px solid rgba(48,54,61,.8); background: rgba(22,27,34,.9); color: #8b949e; white-space: nowrap;
+}
+.xc-btn.on { background: rgba(88,166,255,.15); color: #58a6ff; border-color: rgba(88,166,255,.4); }
+#x-val { font-size: 12px; color: #58a6ff; min-width: 44px; text-align: center; font-weight: 700; }
+#x-slider { flex: 1; min-width: 80px; max-width: 220px; accent-color: #58a6ff; }
+#x-canvas { flex: 1; width: 100%; display: block; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div class="ld-title">3D 大気モデル SE Asia</div>
+  <div class="ld-msg" id="ld-msg">気象データを取得中...</div>
+</div>
+
+<div id="topbar">
+  <div>
+    <div class="tb-title">3D 大気モデル <span style="font-size:10px;color:#3fb950;font-weight:400">JMA GSM</span></div>
+    <div class="tb-sub">🌏 SE Asia (Japan–Indonesia) ｜ <span id="data-time">読み込み中…</span></div>
+  </div>
+  <div class="spacer"></div>
+  <button class="back-btn" onclick="fetchWX(true)" style="margin-right:4px">🔄 更新</button>
+  <a href="wx_3d.html" class="back-btn" style="margin-right:4px">← 日本域</a>
+  <a href="wx_check.html" class="back-btn">← WX Check</a>
+</div>
+
+<div id="mode-panel">
+  <div class="panel-lbl">表示モード</div>
+  <button class="mode-btn on-shear" id="btn-shear"  onclick="setMode('shear')">🟠 鉛直シアー（乱気流）</button>
+  <button class="mode-btn" id="btn-hshear" onclick="setMode('hshear')">↔️ 水平シアー</button>
+  <button class="mode-btn" id="btn-temp"   onclick="setMode('temp')">🌡️ 温度</button>
+  <button class="mode-btn" id="btn-te"     onclick="setMode('te')">🌊 相当温位 θe</button>
+  <div class="panel-lbl" style="margin-top:8px">オーバーレイ</div>
+  <button class="tropo-toggle" id="btn-tropo" onclick="toggleTropo()">圏界面（TROPO）</button>
+  <div class="panel-lbl" style="margin-top:8px">高度フィルター</div>
+  <div id="fl-filter-row" style="display:flex;flex-wrap:wrap;gap:3px;max-width:160px">
+    <button class="fl-filter-btn on" id="flb-all" onclick="setFLFilter(null)">全FL</button>
+  </div>
+  <div class="panel-lbl" style="margin-top:8px">断面図</div>
+  <button class="tropo-toggle" onclick="openXSec('lon')">📊 南北断面（経度固定）</button>
+  <button class="tropo-toggle" style="margin-top:3px" onclick="openXSec('lat')">📊 東西断面（緯度固定）</button>
+</div>
+
+<div id="view-panel">
+  <div class="panel-lbl">視点</div>
+  <button class="view-btn" onclick="gotoView('iso')">斜め（初期）</button>
+  <button class="view-btn" onclick="gotoView('top')">真上から</button>
+  <button class="view-btn" onclick="gotoView('side')">真横（南北）</button>
+  <button class="view-btn" onclick="gotoView('front')">正面（東西）</button>
+</div>
+
+<div id="legend">
+  <div class="leg-title" id="leg-title">シアー (kt/1000ft)</div>
+  <div id="leg-body"></div>
+</div>
+
+<div id="info">
+  ドラッグ：回転<br>ピンチ：ズーム<br>2本指：移動
+  <div class="info-sub" id="info-time">—</div>
+  <div id="mesh-info">グリッド: 19×19 × 7FL = 2527 voxel</div>
+</div>
+
+<!-- 断面図オーバーレイ -->
+<div id="x-panel">
+  <div id="x-topbar">
+    <span id="x-title">断面図</span>
+    <button class="xc-btn on" id="xb-lon" onclick="setXAxis('lon')">南北（経度固定）</button>
+    <button class="xc-btn"    id="xb-lat" onclick="setXAxis('lat')">東西（緯度固定）</button>
+    <span id="x-val">129°E</span>
+    <input type="range" id="x-slider" min="0" max="18" value="11" oninput="onXSlider(this.value)">
+    <button class="xc-btn" onclick="closeXSec()">✕ 閉じる</button>
+  </div>
+  <canvas id="x-canvas"></canvas>
+</div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/","topojson-client":"https://esm.sh/topojson-client@3.1.0"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls }  from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import * as topojson from 'topojson-client';
+
+// ═══════════════════════════════════════════════════════════════
+// GRID CONFIG  (19×19 = 361 points, 3° ≈ 333km spacing)
+// Japan (45°N) to Indonesia (9°S), East Asia to Western Pacific
+// ═══════════════════════════════════════════════════════════════
+const LAT_MIN=-12, LAT_MAX=48, LON_MIN=93, LON_MAX=153;
+const SW=4.8, SD=4.8, SH=2.8;
+
+const GRID_LATS = Array.from({length:19}, (_,i)=>-9+i*3); // -9〜45, 3°step
+const GRID_LONS = Array.from({length:19}, (_,i)=>96+i*3); // 96〜150, 3°step
+const N_LAT = GRID_LATS.length, N_LON = GRID_LONS.length;
+const N_PT  = N_LAT * N_LON;  // 361
+
+// JMA GSM 対応気圧面 (WMO標準強制面) — FL050〜FL390
+// 600hPaはGSMに存在しないため除外
+const FLS = [
+  {fl: 50, hpa:850, label:'FL050', km:1.52},
+  {fl:100, hpa:700, label:'FL100', km:3.05},
+  {fl:180, hpa:500, label:'FL180', km:5.49},
+  {fl:240, hpa:400, label:'FL240', km:7.32},
+  {fl:300, hpa:300, label:'FL300', km:9.14},
+  {fl:340, hpa:250, label:'FL340', km:10.36},
+  {fl:390, hpa:200, label:'FL390', km:11.89},
+];
+const N_FL = FLS.length;
+const FL_KM = FLS.map(f=>f.km);
+const FL_MIN=50, FL_MAX=390;
+
+const AIRPORTS = [
+  // Japan
+  {id:'ROAH',lat:26.2,lon:127.6},  // 那覇
+  {id:'RJFF',lat:33.6,lon:130.4},  // 福岡
+  {id:'RJBB',lat:34.8,lon:135.2},  // 伊丹/関空
+  {id:'RJTT',lat:35.5,lon:139.8},  // 羽田
+  // Korea
+  {id:'RKSI',lat:37.5,lon:126.5},  // 仁川
+  // China/HK/Taiwan
+  {id:'VHHH',lat:22.3,lon:113.9},  // 香港
+  {id:'RCTP',lat:25.1,lon:121.2},  // 台北
+  // Philippines
+  {id:'RPLL',lat:14.5,lon:121.0},  // マニラ
+  // Vietnam
+  {id:'VVTS',lat:10.8,lon:106.7},  // ホーチミン
+  {id:'VVNB',lat:21.2,lon:105.8},  // ハノイ
+  // Thailand
+  {id:'VTBS',lat:13.7,lon:100.7},  // バンコク
+  // Malaysia/Singapore
+  {id:'WMKK',lat: 2.7,lon:101.7},  // クアラルンプール
+  {id:'WSSS',lat: 1.4,lon:103.9},  // シンガポール
+  // Indonesia
+  {id:'WIII',lat:-6.1,lon:106.7},  // ジャカルタ
+  {id:'WADD',lat:-8.7,lon:115.2},  // バリ
+];
+
+// ── coord transforms ────────────────────────────────────────────
+const X = lon => ((lon-LON_MIN)/(LON_MAX-LON_MIN) - .5) * SW;
+const Z = lat => -(((lat-LAT_MIN)/(LAT_MAX-LAT_MIN)) - .5) * SD;
+const Y = fl  => ((fl-FL_MIN)/(FL_MAX-FL_MIN)) * SH;
+
+// ── physics calculations ────────────────────────────────────────
+function calcShears(winds) {
+  return winds.map((w, i) => {
+    let sum = 0, cnt = 0;
+    if (i > 0) {
+      const dv = Math.abs(winds[i] - winds[i-1]);
+      const dz = FL_KM[i] - FL_KM[i-1];
+      sum += dv / (dz * 3.281); cnt++;
+    }
+    if (i < N_FL-1) {
+      const dv = Math.abs(winds[i+1] - winds[i]);
+      const dz = FL_KM[i+1] - FL_KM[i];
+      sum += dv / (dz * 3.281); cnt++;
+    }
+    return cnt ? sum/cnt : 0;
+  });
+}
+
+function calcThetaE(T_C, p_hPa, rh) {
+  if (rh <= 0) rh = 1;
+  const T  = T_C + 273.15;
+  const es = 6.112 * Math.exp(17.67 * T_C / (T_C + 243.5));
+  const e  = (rh / 100) * es;
+  const r  = 622 * e / (p_hPa - e);
+  const TL = 1 / (1/(T - 55) - Math.log(rh / 100) / 2840);
+  const theta = T * Math.pow(1000/p_hPa, 0.2854 * (1 - 0.00028*r));
+  return theta * Math.exp((3.376/TL - 0.00254) * r * (1 + 0.00081*r));
+}
+
+function findTropo(temps) {
+  for (let i = 3; i < N_FL-1; i++) {
+    const dT = temps[i+1] - temps[i];
+    const dZ = FL_KM[i+1] - FL_KM[i];
+    const gamma = -dT / dZ;
+    if (gamma < 2.0) return i + Math.max(0, Math.min(1, (2.0-gamma)/4));
+  }
+  return N_FL - 1;
+}
+
+// ── color maps ──────────────────────────────────────────────────
+function shearRGB(s) {
+  if (s <= 5)  return [0, 0, 0];
+  if (s <= 8)  return [0.12, 0.80, 0.12];
+  if (s <= 11) return [0.90, 0.72, 0];
+  if (s <= 15) return [1.00, 0.20, 0];
+  return              [0.85, 0,    0.95];
+}
+function tempRGB(t) {
+  if (t < -50) return [0.12, 0.12, 0.95];
+  if (t < -30) return [0.10, 0.50, 1.00];
+  if (t < -15) return [0.00, 0.88, 0.98];
+  if (t <   0) return [0.10, 0.90, 0.40];
+  if (t <  15) return [1.00, 0.82, 0.00];
+  return              [1.00, 0.28, 0.05];
+}
+function hshearRGB(s) {
+  if (s <  2)  return [0, 0, 0];
+  if (s <  5)  return [0.03, 0.40, 0.03];
+  if (s < 10)  return [0.50, 0.42, 0];
+  if (s < 20)  return [0.68, 0.03, 0];
+  return              [0.58, 0,    0.72];
+}
+function windUV(w, dir) {
+  const r = dir * Math.PI / 180;
+  return { u: -w * Math.sin(r), v: -w * Math.cos(r) };
+}
+function calcHorizShear(li, oi, hpa) {
+  const lat = GRID_LATS[li];
+  const dx = 111.0 * Math.cos(lat * Math.PI/180);
+  const dy = 111.0;
+  let dU2=0, dV2=0;
+  if (oi>0 && oi<N_LON-1) {
+    const de=wxData[li*N_LON+oi+1]?.[hpa], dw=wxData[li*N_LON+oi-1]?.[hpa];
+    if(de&&dw){
+      const {u:ue,v:ve}=windUV(de.w,de.dir), {u:uw,v:vw}=windUV(dw.w,dw.dir);
+      dU2 += ((ue-uw)/(2*dx))**2;
+      dV2 += ((ve-vw)/(2*dx))**2;
+    }
+  }
+  if (li>0 && li<N_LAT-1) {
+    const dn=wxData[(li+1)*N_LON+oi]?.[hpa], ds=wxData[(li-1)*N_LON+oi]?.[hpa];
+    if(dn&&ds){
+      const {u:un,v:vn}=windUV(dn.w,dn.dir), {u:us,v:vs}=windUV(ds.w,ds.dir);
+      dU2 += ((un-us)/(2*dy))**2;
+      dV2 += ((vn-vs)/(2*dy))**2;
+    }
+  }
+  return Math.sqrt(dU2+dV2) * 100;
+}
+function teGradRGB(g) {
+  if (g < -4)   return [1.00, 0.00, 0.00];
+  if (g < -1.5) return [1.00, 0.50, 0.00];
+  if (g < 0)    return [1.00, 0.90, 0.00];
+  if (g < 1.0)  return [0, 0, 0];
+  if (g < 4)    return [0.20, 0.60, 1.00];
+  return              [0.05, 0.18, 0.90];
+}
+
+// ── 矢羽描画 ────────────────────────────────────────────────────
+function drawWindBarb(ctx, x, y, spd, dir, sz) {
+  ctx.save();
+  ctx.strokeStyle='rgba(255,255,255,0.88)';
+  ctx.fillStyle  ='rgba(255,255,255,0.88)';
+  ctx.lineWidth  = Math.max(1, sz*0.12);
+  ctx.lineCap    = 'round';
+  if (spd < 2.5) {
+    ctx.beginPath(); ctx.arc(x,y,sz*0.5,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x,y,sz*0.25,0,Math.PI*2); ctx.stroke();
+    ctx.restore(); return;
+  }
+  const rad = dir * Math.PI / 180;
+  const sdx = Math.sin(rad), sdy = -Math.cos(rad);
+  const stLen = sz * 2.2;
+  const tx = x + sdx*stLen, ty = y + sdy*stLen;
+  const bx = -sdy, by = sdx;
+  const bLen = sz * 0.80;
+  const step = stLen * 0.22;
+  ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(tx,ty); ctx.stroke();
+  let rem=spd, pos=0;
+  while(rem>=47.5){
+    const p0x=tx-sdx*pos, p0y=ty-sdy*pos;
+    const p1x=tx-sdx*(pos+step*1.6), p1y=ty-sdy*(pos+step*1.6);
+    ctx.beginPath(); ctx.moveTo(p0x,p0y); ctx.lineTo(p0x+bx*bLen,p0y+by*bLen); ctx.lineTo(p1x,p1y);
+    ctx.closePath(); ctx.fill();
+    rem-=50; pos+=step*1.8;
+  }
+  while(rem>=7.5){
+    const p0x=tx-sdx*pos, p0y=ty-sdy*pos;
+    ctx.beginPath(); ctx.moveTo(p0x,p0y); ctx.lineTo(p0x+bx*bLen,p0y+by*bLen); ctx.stroke();
+    rem-=10; pos+=step;
+  }
+  if(rem>=2.5){
+    const p0x=tx-sdx*pos, p0y=ty-sdy*pos;
+    ctx.beginPath(); ctx.moveTo(p0x,p0y); ctx.lineTo(p0x+bx*bLen*0.5,p0y+by*bLen*0.5); ctx.stroke();
+  }
+  ctx.beginPath(); ctx.arc(x,y,1.5,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+// ── THREE.js setup ──────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x060b12);
+document.body.appendChild(renderer.domElement);
+
+const lrender = new CSS2DRenderer();
+lrender.setSize(innerWidth, innerHeight);
+Object.assign(lrender.domElement.style, {
+  position:'fixed', top:'0', left:'0', width:'100%', height:'100%',
+  pointerEvents:'none', zIndex:'5'
+});
+document.body.appendChild(lrender.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.05, 60);
+camera.position.set(6.0, 4.5, 6.0);
+
+const ctrl = new OrbitControls(camera, renderer.domElement);
+ctrl.target.set(0, SH/2, 0);
+ctrl.enableDamping = true; ctrl.dampingFactor = 0.07;
+ctrl.minDistance = 1.0; ctrl.maxDistance = 24;
+ctrl.update();
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const dl = new THREE.DirectionalLight(0xffffff, 0.8);
+dl.position.set(4, 7, 4); scene.add(dl);
+
+// ── base map plane ──────────────────────────────────────────────
+const baseMat = new THREE.MeshBasicMaterial({
+  side: THREE.DoubleSide, transparent: true, opacity: 0.95
+});
+const baseMesh = new THREE.Mesh(new THREE.PlaneGeometry(SW, SD), baseMat);
+baseMesh.rotation.x = -Math.PI/2; baseMesh.position.y = -.01;
+scene.add(baseMesh);
+
+function drawGeoPath(ctx, geom, cx, cy) {
+  if (!geom) return;
+  const ring = coords => {
+    let first = true;
+    for (const [lon, lat] of coords) {
+      const x = cx(lon), y = cy(lat);
+      if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  };
+  ctx.beginPath();
+  if (geom.type === 'Polygon')
+    geom.coordinates.forEach(ring);
+  else if (geom.type === 'MultiPolygon')
+    geom.coordinates.forEach(p => p.forEach(ring));
+  else if (geom.type === 'MultiLineString')
+    geom.coordinates.forEach(line => {
+      let first = true;
+      for (const [lon, lat] of line) {
+        const x = cx(lon), y = cy(lat);
+        if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y);
+      }
+    });
+}
+
+(async function buildMap() {
+  const CW=1400, CH=1400;
+  const c = document.createElement('canvas'); c.width=CW; c.height=CH;
+  const ctx = c.getContext('2d');
+  const cx = lon => (lon-LON_MIN)/(LON_MAX-LON_MIN)*CW;
+  const cy = lat => (1-(lat-LAT_MIN)/(LAT_MAX-LAT_MIN))*CH;
+
+  ctx.fillStyle='#091520'; ctx.fillRect(0,0,CW,CH);
+  ctx.save(); ctx.beginPath(); ctx.rect(0,0,CW,CH); ctx.clip();
+
+  try {
+    const world = await fetch(
+      'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json'
+    ).then(r => r.json());
+
+    const countries = topojson.feature(world, world.objects.countries);
+    ctx.fillStyle='#1c4030'; ctx.strokeStyle='#1c4030'; ctx.lineWidth=0.3;
+    for (const f of countries.features) {
+      drawGeoPath(ctx, f.geometry, cx, cy);
+      ctx.fill('evenodd'); ctx.stroke();
+    }
+    const coast = topojson.mesh(world, world.objects.countries, (a,b) => a === b);
+    ctx.strokeStyle='#52c07a'; ctx.lineWidth=1.4;
+    drawGeoPath(ctx, coast, cx, cy); ctx.stroke();
+
+    const borders = topojson.mesh(world, world.objects.countries, (a,b) => a !== b);
+    ctx.strokeStyle='rgba(100,170,120,0.5)'; ctx.lineWidth=0.6;
+    drawGeoPath(ctx, borders, cx, cy); ctx.stroke();
+  } catch(e) {
+    console.warn('地図データ取得失敗:', e);
+    ctx.fillStyle='#1c4030'; ctx.strokeStyle='#2e5540'; ctx.lineWidth=1;
+    // 簡略フォールバック (大陸輪郭のみ)
+    const poly = coords => {
+      ctx.beginPath();
+      coords.forEach(([ln,la],i)=>i?ctx.lineTo(cx(ln),cy(la)):ctx.moveTo(cx(ln),cy(la)));
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    };
+    poly([[93,48],[93,12],[96,12],[100,3],[104,1],[110,-6],[118,-8],[130,0],[140,10],[145,20],[148,30],[148,48]]);
+  }
+
+  ctx.restore();
+
+  // グリッド線
+  ctx.setLineDash([4,4]); ctx.lineWidth=0.7;
+  for(let lon=100; lon<=150; lon+=10){
+    ctx.strokeStyle='rgba(50,100,160,0.35)';
+    ctx.beginPath(); ctx.moveTo(cx(lon),0); ctx.lineTo(cx(lon),CH); ctx.stroke();
+  }
+  for(let lat=-5; lat<=45; lat+=10){
+    ctx.strokeStyle='rgba(50,100,160,0.35)';
+    ctx.beginPath(); ctx.moveTo(0,cy(lat)); ctx.lineTo(CW,cy(lat)); ctx.stroke();
+  }
+  // 赤道ライン強調
+  ctx.setLineDash([6,3]);
+  ctx.strokeStyle='rgba(80,140,80,0.45)'; ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.moveTo(0,cy(0)); ctx.lineTo(CW,cy(0)); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='rgba(100,170,100,0.6)'; ctx.font='bold 10px monospace';
+  ctx.fillText('EQ', 4, cy(0)-3);
+
+  // ラベル
+  ctx.fillStyle='rgba(100,160,220,0.55)'; ctx.font='bold 11px monospace';
+  for(let lon=100;lon<=150;lon+=10) ctx.fillText(lon+'E', cx(lon)+3, CH-6);
+  for(let lat=-5;lat<=45;lat+=10){
+    const label = lat>=0 ? lat+'N' : Math.abs(lat)+'S';
+    ctx.fillText(label, 3, cy(lat)-3);
+  }
+
+  baseMat.map = new THREE.CanvasTexture(c);
+  baseMat.color.set(0xffffff); baseMat.needsUpdate = true;
+})();
+
+// ── FL grid lines & labels ───────────────────────────────────────
+const FLS_SET = new Set(FLS.map(f=>f.fl));
+const lm  = new THREE.LineBasicMaterial({color:0x1e3a60,transparent:true,opacity:.28});
+const lm2 = new THREE.LineBasicMaterial({color:0x162840,transparent:true,opacity:.15});
+const flLineGroup = new THREE.Group();
+
+for (const {fl} of FLS) {
+  const y = Y(fl);
+  const pts = [[-SW/2,-SD/2],[SW/2,-SD/2],[SW/2,SD/2],[-SW/2,SD/2],[-SW/2,-SD/2]]
+    .map(([x,z])=>new THREE.Vector3(x,y,z));
+  flLineGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),lm));
+  const pm = new THREE.Mesh(new THREE.PlaneGeometry(SW,SD),
+    new THREE.MeshBasicMaterial({color:0x1a3a60,side:THREE.DoubleSide,transparent:true,opacity:.03,depthWrite:false}));
+  pm.rotation.x=-Math.PI/2; pm.position.y=y; flLineGroup.add(pm);
+}
+
+const flFilterRow = document.getElementById('fl-filter-row');
+for (let fl = FL_MIN; fl <= FL_MAX; fl += 20) {
+  const y = Y(fl);
+  const isData = FLS_SET.has(fl);
+  const label = `FL${String(fl).padStart(3,'0')}`;
+  if (!isData) {
+    const tk = [new THREE.Vector3(-SW/2,y,-SD/2), new THREE.Vector3(-SW/2+.18,y,-SD/2)];
+    flLineGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(tk),lm2));
+  }
+  const el = document.createElement('div');
+  el.className = isData ? 'lbl lbl-data' : 'lbl';
+  el.textContent = label;
+  const obj = new CSS2DObject(el);
+  obj.position.set(-SW/2-.22, y, -SD/2);
+  flLineGroup.add(obj);
+}
+scene.add(flLineGroup);
+
+// フィルターボタン (全FLSレベル)
+FLS.forEach(({fl,label},fi) => {
+  const btn = document.createElement('button');
+  btn.className = 'fl-filter-btn';
+  btn.id = `flb-${fi}`;
+  btn.textContent = label;
+  btn.onclick = ()=>setFLFilter(fi);
+  flFilterRow.appendChild(btn);
+});
+
+// 縦エッジ
+const vm=new THREE.LineBasicMaterial({color:0x1e3a60,transparent:true,opacity:.35});
+for (const [lx,lz] of [[-1,1],[1,1],[1,-1],[-1,-1]]) {
+  const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(lx*SW/2,0,lz*SD/2),new THREE.Vector3(lx*SW/2,SH,lz*SD/2)]);
+  scene.add(new THREE.Line(g,vm));
+}
+
+// 地表グリッド
+const gm=new THREE.LineBasicMaterial({color:0x182a40,transparent:true,opacity:.45});
+for (const lat of GRID_LATS) {
+  const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(X(LON_MIN),0,Z(lat)),new THREE.Vector3(X(LON_MAX),0,Z(lat))]);
+  scene.add(new THREE.Line(g,gm));
+}
+for (const lon of GRID_LONS) {
+  const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(X(lon),0,Z(LAT_MIN)),new THREE.Vector3(X(lon),0,Z(LAT_MAX))]);
+  scene.add(new THREE.Line(g,gm));
+}
+
+// 赤道ライン (3D)
+{
+  const eqMat = new THREE.LineBasicMaterial({color:0x3a8050,transparent:true,opacity:.6});
+  const eqPts = [new THREE.Vector3(X(LON_MIN),0,Z(0)), new THREE.Vector3(X(LON_MAX),0,Z(0))];
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(eqPts), eqMat));
+  const eqEl = document.createElement('div');
+  eqEl.style.cssText='color:rgba(80,180,100,.8);font-size:9px;font-family:monospace;background:rgba(6,11,18,.5);padding:1px 3px;border-radius:2px;pointer-events:none';
+  eqEl.textContent='EQ';
+  const eqObj = new CSS2DObject(eqEl);
+  eqObj.position.set(X(LON_MIN)-.1, 0, Z(0));
+  scene.add(eqObj);
+}
+
+// 空港
+for (const {id,lat,lon} of AIRPORTS) {
+  const x=X(lon),z=Z(lat);
+  if (x<-SW/2-.1||x>SW/2+.1||z<-SD/2-.1||z>SD/2+.1) continue;
+  const dot=new THREE.Mesh(new THREE.SphereGeometry(.055,10,10),new THREE.MeshBasicMaterial({color:0x58a6ff}));
+  dot.position.set(x,.04,z); scene.add(dot);
+  const el=document.createElement('div'); el.className='albl'; el.textContent=id;
+  const obj=new CSS2DObject(el); obj.position.set(x,.15,z); scene.add(obj);
+}
+
+// ── voxels (InstancedMesh) ───────────────────────────────────────
+const VW = (SW/(N_LON-1))*.84;
+const VD = (SD/(N_LAT-1))*.84;
+const VH = (SH/N_FL)*.72;
+const vGeo = new THREE.BoxGeometry(VW,VH,VD);
+const imeshes = [];
+const _dummy  = new THREE.Object3D();
+const _col    = new THREE.Color();
+
+function updateMaterialBlending() {
+  const opac = {shear:0.55, hshear:0.55, temp:0.18, te:0.18};
+  imeshes.forEach(im => {
+    im.material.blending = THREE.NormalBlending;
+    im.material.opacity  = opac[mode] ?? 0.22;
+    im.material.needsUpdate = true;
+  });
+}
+
+function buildVoxels() {
+  FLS.forEach(({fl},fi) => {
+    const mat = new THREE.MeshBasicMaterial({
+      transparent:true, depthWrite:false,
+      blending:THREE.AdditiveBlending,
+    });
+    const im = new THREE.InstancedMesh(vGeo, mat, N_PT);
+    im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    GRID_LATS.forEach((lat,li) => GRID_LONS.forEach((lon,oi) => {
+      const pi = li*N_LON+oi;
+      _dummy.position.set(X(lon), Y(fl), Z(lat));
+      _dummy.updateMatrix();
+      im.setMatrixAt(pi, _dummy.matrix);
+      im.setColorAt(pi, _col.set(0));
+    }));
+    im.instanceMatrix.needsUpdate = true;
+    im.instanceColor.needsUpdate = true;
+    scene.add(im);
+    imeshes[fi] = im;
+  });
+}
+
+// ── tropopause surface ──────────────────────────────────────────
+let tropoMesh = null, showTropo = false;
+
+function buildTropoSurface(tropoY) {
+  const pos = [], col = [];
+  GRID_LATS.forEach((lat,li) => GRID_LONS.forEach((lon,oi) => {
+    const y = tropoY[li][oi];
+    pos.push(X(lon), y, Z(lat));
+    const t = Math.max(0, Math.min(1, (y - Y(280))/(Y(390)-Y(280))));
+    col.push(1-t*0.85, t*0.35, t*0.88+0.12);
+  }));
+  const idx = [];
+  for (let li=0; li<N_LAT-1; li++) for (let oi=0; oi<N_LON-1; oi++) {
+    const a=li*N_LON+oi, b=a+1, c=(li+1)*N_LON+oi, d=c+1;
+    idx.push(a,b,c, b,d,c);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute('color',    new THREE.Float32BufferAttribute(col,3));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  const mat = new THREE.MeshLambertMaterial({
+    vertexColors:true, transparent:true, opacity:0.78,
+    side:THREE.DoubleSide, depthWrite:false
+  });
+  if (tropoMesh) { scene.remove(tropoMesh); }
+  tropoMesh = new THREE.Mesh(geo, mat);
+  tropoMesh.visible = showTropo;
+  scene.add(tropoMesh);
+  const edges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(geo, 15),
+    new THREE.LineBasicMaterial({color:0xaaddff, transparent:true, opacity:0.50, depthWrite:false})
+  );
+  edges.visible = showTropo;
+  tropoMesh.add(edges);
+}
+
+// ── data & rendering ────────────────────────────────────────────
+let wxData = null, mode = 'shear', flFilter = null;
+
+window.setFLFilter = fi => {
+  flFilter = fi;
+  document.querySelectorAll('.fl-filter-btn').forEach(b=>b.classList.remove('on'));
+  document.getElementById(fi===null?'flb-all':`flb-${fi}`)?.classList.add('on');
+  applyColors();
+};
+
+function applyColors() {
+  if (!wxData) return;
+  GRID_LATS.forEach((lat,li) => GRID_LONS.forEach((lon,oi) => {
+    const pi = li*N_LON+oi;
+    const d = wxData[pi]; if(!d) return;
+    const winds  = FLS.map(({hpa})=>d[hpa]?.w??0);
+    const shears = calcShears(winds);
+    const tes = (mode==='te') ? FLS.map(({hpa:h})=>{
+      const {t,rh}=d[h]??{t:-50,rh:50};
+      return calcThetaE(t,h,rh);
+    }) : null;
+
+    FLS.forEach(({fl,hpa},fi) => {
+      const {t,rh} = d[hpa]??{t:-50,rh:50};
+      let rgb;
+      if (mode==='shear')       rgb = shearRGB(shears[fi]);
+      else if (mode==='hshear') rgb = hshearRGB(calcHorizShear(li, oi, hpa));
+      else if (mode==='temp')   rgb = tempRGB(t);
+      else {
+        const fi2=fi<N_FL-1?fi+1:fi-1, sign=fi<N_FL-1?1:-1;
+        const dz=Math.abs(FLS[fi2].km-FLS[fi].km);
+        rgb = teGradRGB(sign*(tes[fi2]-tes[fi])/dz);
+      }
+      const filtered = (flFilter !== null && fi !== flFilter);
+      const visible = !filtered && (rgb[0]+rgb[1]+rgb[2]) > 0.015;
+      _dummy.position.set(X(lon), Y(fl), Z(lat));
+      _dummy.scale.setScalar(visible ? 1.0 : 0.001);
+      _dummy.updateMatrix();
+      imeshes[fi].setMatrixAt(pi, _dummy.matrix);
+      imeshes[fi].setColorAt(pi, _col.setRGB(rgb[0],rgb[1],rgb[2]));
+    });
+  }));
+  imeshes.forEach(im => {
+    im.instanceColor.needsUpdate  = true;
+    im.instanceMatrix.needsUpdate = true;
+  });
+  if(document.getElementById('x-panel')?.style.display!=='none') drawXSection();
+}
+
+// ── デモデータ生成 (SE Asia版) ─────────────────────────────────
+function generateDemoData() {
+  const hpas = FLS.map(f=>f.hpa);
+  const stdT = {850:8, 700:-5, 500:-21, 400:-33, 300:-47, 250:-56, 200:-57};
+  const tropoY = GRID_LATS.map(()=>new Array(N_LON).fill(Y(380)));
+
+  const data = GRID_LATS.map((lat,li)=>GRID_LONS.map((lon,oi)=>{
+    const pd={};
+    // ジェット気流コア: 35°N付近、250hPaで最大140kt
+    const jetLat = 35 + 3*Math.sin((lon-120)*Math.PI/35);
+    const jetDist = Math.abs(lat - jetLat);
+    const jetEnv  = Math.exp(-0.5*(jetDist/5)**2);
+    // 熱帯収束帯 (ITCZ): 5-8°N付近で対流活発
+    const itczLat = 6 + 2*Math.sin((lon-100)*Math.PI/20);
+    const itczDist = Math.abs(lat - itczLat);
+    const itczEnv  = Math.exp(-0.5*(itczDist/3)**2);
+
+    hpas.forEach(h=>{
+      const hPeak = {850:0.15, 700:0.35, 500:0.68, 400:0.85, 300:0.95, 250:1.00, 200:0.88}[h];
+      const baseSpd = 10 + 120 * jetEnv * hPeak;
+      const noise   = 5*(Math.random()-0.5);
+      const w       = Math.max(2, baseSpd + noise);
+      const dirBase = {850:240, 700:258, 500:268, 400:272, 300:278, 250:280, 200:282}[h];
+      const dir     = (dirBase + 10*(Math.random()-0.5) + 360) % 360;
+      // 熱帯は温暖・湿潤, 高緯度は寒冷
+      const tropicalBonus = lat < 20 ? (20-lat)*0.8 : 0;
+      const t = stdT[h] + (lat-35)*(-0.5) + tropicalBonus + (lon-135)*(0.1) + (Math.random()-0.5)*1.5;
+      // 熱帯低層は湿度高め (ITCZ付近は特に)
+      const rhBase = {850:65, 700:45, 500:32, 400:25, 300:18, 250:15, 200:12}[h];
+      const itczRH = h >= 500 ? itczEnv*25 : 0;
+      const rh = Math.max(5, Math.min(100, rhBase + itczRH + 15*(Math.random()-0.5)));
+      pd[h]={w,dir,t,rh};
+    });
+    // 圏界面: 熱帯(lat<20)は高め → FL390付近、高緯度は低め → FL300以下
+    const tropoFL_base = lat < 0  ? FL_MAX :
+                         lat < 20 ? 390 - lat*1.5 :
+                                    390 - (lat-20)*3;
+    const tropoFL = tropoFL_base + 8*Math.sin((lon-100)*Math.PI/12);
+    tropoY[li][oi] = Y(Math.max(FL_MIN+20, Math.min(FL_MAX, tropoFL)));
+    return pd;
+  })).flat();
+
+  return {data, tropoY};
+}
+
+async function fetchWX(force=false) {
+  if (!force) {
+    try {
+      const cached = JSON.parse(localStorage.getItem('wx3d_sea_cache')||'null');
+      if (cached && Date.now()-cached.ts < 45*60*1000) {
+        wxData = cached.wx;
+        buildTropoSurface(cached.tropoY);
+        const cd = new Date(cached.ts);
+        const ts = `データ: ${cd.getHours()}:00 JST 📦`;
+        document.getElementById('data-time').textContent=ts;
+        document.getElementById('info-time').textContent=ts;
+        applyColors();
+        document.getElementById('loading').style.display='none';
+        return;
+      }
+    } catch(e) { console.warn('cache read:', e); }
+  }
+  try {
+    const lats=[],lons=[];
+    GRID_LATS.forEach(la=>GRID_LONS.forEach(lo=>{lats.push(la);lons.push(lo);}));
+    const hpas = FLS.map(f=>f.hpa);
+    const wv  = hpas.map(h=>`wind_speed_${h}hPa`).join(',');
+    const dv  = hpas.map(h=>`wind_direction_${h}hPa`).join(',');
+    const tv  = hpas.map(h=>`temperature_${h}hPa`).join(',');
+    const rhv = hpas.map(h=>`relative_humidity_${h}hPa`).join(',');
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=${wv},${dv},${tv},${rhv}&wind_speed_unit=kn&forecast_days=1&timezone=Asia/Tokyo&models=jma_gsm`;
+    const raw = await (await fetch(url)).json();
+    if (!Array.isArray(raw) && raw.error) {
+      console.warn('API limit, falling back to demo data:', raw.reason);
+      const {data, tropoY: ty} = generateDemoData();
+      wxData = data;
+      buildTropoSurface(ty);
+      const now2 = new Date();
+      const ts2 = `デモデータ ⚡ (API制限中 — ${now2.getHours()}:00 JST)`;
+      document.getElementById('data-time').textContent=ts2;
+      document.getElementById('info-time').textContent=ts2;
+      applyColors();
+      document.getElementById('loading').style.display='none';
+      return;
+    }
+    const locs = Array.isArray(raw)?raw:[raw];
+    const now = new Date();
+    const ns = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:00`;
+    const tropoY = GRID_LATS.map(()=>new Array(N_LON).fill(Y(370)));
+    wxData = locs.map((loc,pi) => {
+      const times=loc.hourly.time;
+      let hi=times.indexOf(ns); if(hi<0) hi=0;
+      const pd={};
+      hpas.forEach(h=>{
+        pd[h]={
+          w:   loc.hourly[`wind_speed_${h}hPa`]?.[hi]??0,
+          dir: loc.hourly[`wind_direction_${h}hPa`]?.[hi]??0,
+          t:   loc.hourly[`temperature_${h}hPa`]?.[hi]??-50,
+          rh:  loc.hourly[`relative_humidity_${h}hPa`]?.[hi]??50,
+        };
+      });
+      const temps = FLS.map(({hpa})=>pd[hpa].t);
+      const tropoIdx = findTropo(temps);
+      const fi0=Math.floor(tropoIdx), fi1=Math.min(N_FL-1,fi0+1);
+      const frac=tropoIdx-fi0;
+      const fl0=FLS[fi0].fl, fl1=FLS[fi1].fl;
+      const tropoFL = fl0+(fl1-fl0)*frac;
+      const li=Math.floor(pi/N_LON), oi=pi%N_LON;
+      if(li<N_LAT&&oi<N_LON) tropoY[li][oi]=Y(tropoFL);
+      return pd;
+    });
+    buildTropoSurface(tropoY);
+    const ts=`データ: ${now.getHours()}:00 JST`;
+    document.getElementById('data-time').textContent=ts;
+    document.getElementById('info-time').textContent=ts;
+    try { localStorage.setItem('wx3d_sea_cache', JSON.stringify({ts:Date.now(), wx:wxData, tropoY})); }
+    catch(ce) { console.warn('cache write:', ce); }
+  } catch(e) {
+    console.error(e);
+    document.getElementById('ld-msg').textContent='データ取得失敗';
+    return;
+  }
+  applyColors();
+  document.getElementById('loading').style.display='none';
+}
+
+// ── UI ──────────────────────────────────────────────────────────
+const LEGENDS = {
+  shear:{title:'鉛直シアー (kt/1000ft) — 乱気流',rows:[
+    ['#cc00ee','超激 >15 kt'],['#ff3300','激 12-15 kt'],['#e6b800','強 9-11 kt'],['#1fcc1f','中 6-8 kt'],
+  ]},
+  hshear:{title:'水平シアー (kt/100km)',rows:[
+    ['#8800bb','激 ≥20'],['#ff2200','強 10-20'],['#cc9900','中 5-10'],['#009900','弱 2-5'],
+  ]},
+  temp:{title:'温度 (°C)',rows:[
+    ['#ff4708','>+15'],['#ffd100','+15〜0'],['#17e6fa','0〜−15'],['#1a80ff','−15〜−30'],['#1f1ff2','<−30'],
+  ]},
+  te:{title:'θe 安定度 ∂θe/∂z (K/km)',rows:[
+    ['#ff0000','強不安定 < −4'],['#ff8000','不安定 −4〜−1.5'],['#ffd100','弱不安定 −1.5〜0'],
+    ['#3399ff','安定 1〜4'],['#0833e5','強安定 > 4'],
+  ]},
+};
+
+function renderLegend(m) {
+  const L=LEGENDS[m];
+  document.getElementById('leg-title').textContent=L.title;
+  document.getElementById('leg-body').innerHTML=L.rows.map(([c,t])=>
+    `<div class="leg-row"><div class="leg-sw" style="background:${c}"></div>${t}</div>`
+  ).join('');
+}
+
+window.setMode = m => {
+  mode=m;
+  ['shear','hshear','temp','te'].forEach(k=>{
+    document.getElementById(`btn-${k}`).className='mode-btn'+(m===k?` on-${m==='hshear'?'shear':m}`:'');
+  });
+  updateMaterialBlending();
+  renderLegend(m); applyColors();
+};
+
+window.toggleTropo = () => {
+  showTropo=!showTropo;
+  document.getElementById('btn-tropo').className='tropo-toggle'+(showTropo?' on':'');
+  if(tropoMesh) {
+    tropoMesh.visible=showTropo;
+    tropoMesh.children.forEach(c=>c.visible=showTropo);
+  }
+};
+
+const VIEWS={
+  iso:{p:[6.0,4.5,6.0],  t:[0,SH/2,0]},
+  top:{p:[0,11,.01],      t:[0,SH/2,0]},
+  side:{p:[0,SH/2,8.0],   t:[0,SH/2,0]},
+  front:{p:[8.0,SH/2,0],  t:[0,SH/2,0]},
+};
+window.gotoView = k => {
+  const {p,t}=VIEWS[k];
+  const tp=new THREE.Vector3(...p),tt=new THREE.Vector3(...t);
+  const sp=camera.position.clone(),st=ctrl.target.clone(),t0=performance.now();
+  (function step(now){
+    const k=Math.min(1,(now-t0)/750),e=k<.5?2*k*k:-1+(4-2*k)*k;
+    camera.position.lerpVectors(sp,tp,e);
+    ctrl.target.lerpVectors(st,tt,e);
+    ctrl.update(); if(k<1) requestAnimationFrame(step);
+  })(t0);
+};
+
+// ── 断面図 ─────────────────────────────────────────────────────
+let xAxis='lon', xIdx=11; // default: 129°E (GRID_LONS[11] = 96+11*3 = 129)
+
+window.openXSec = axis => {
+  xAxis=axis;
+  document.getElementById('x-panel').style.display='flex';
+  document.getElementById('x-slider').max = (axis==='lon'?N_LON:N_LAT)-1;
+  document.getElementById('x-slider').value = xIdx;
+  ['lon','lat'].forEach(a=>document.getElementById(`xb-${a}`).className='xc-btn'+(a===axis?' on':''));
+  updateXVal();
+  setTimeout(drawXSection,60);
+};
+window.closeXSec = ()=>{ document.getElementById('x-panel').style.display='none'; };
+window.setXAxis  = axis=>window.openXSec(axis);
+window.onXSlider = v=>{ xIdx=+v; updateXVal(); drawXSection(); };
+
+function updateXVal(){
+  if(xAxis==='lon'){
+    document.getElementById('x-val').textContent=`${GRID_LONS[xIdx]}°E`;
+  } else {
+    const lat=GRID_LATS[xIdx];
+    document.getElementById('x-val').textContent = lat>=0 ? `${lat}°N` : `${Math.abs(lat)}°S`;
+  }
+}
+
+function drawXSection(){
+  if(!wxData) return;
+  const el=document.getElementById('x-canvas'); if(!el) return;
+  const dpr=devicePixelRatio||1;
+  const cW=el.clientWidth, cH=el.clientHeight;
+  el.width=cW*dpr; el.height=cH*dpr;
+  const ctx=el.getContext('2d'); ctx.scale(dpr,dpr);
+
+  ctx.fillStyle='#060b12'; ctx.fillRect(0,0,cW,cH);
+
+  const ML=62, MR=52, MT=44, MB=48;
+  const aW=cW-ML-MR, aH=cH-MT-MB;
+
+  const pts=(xAxis==='lon')
+    ?GRID_LATS.map((lat,li)=>({
+        key: lat>=0 ? lat+'N' : Math.abs(lat)+'S',
+        pi:li*N_LON+xIdx
+    }))
+    :GRID_LONS.map((lon,oi)=>({key:lon+'E',pi:xIdx*N_LON+oi}));
+  const N=pts.length;
+  const cellW=aW/N, cellH=aH/N_FL;
+
+  pts.forEach(({pi},xi)=>{
+    const d=wxData[pi]; if(!d) return;
+    const winds=FLS.map(({hpa:h})=>d[h]?.w??0);
+    const shears=calcShears(winds);
+    const tes=(mode==='te')?FLS.map(({hpa:h})=>{
+      const {t,rh}=d[h]??{t:-50,rh:50};
+      return calcThetaE(t,h,rh);
+    }):null;
+    FLS.forEach(({hpa},fi)=>{
+      const {t,rh}=d[hpa]??{t:-50,rh:50};
+      const li2=Math.floor(pi/N_LON), oi2=pi%N_LON;
+      let rgb;
+      if(mode==='shear')       rgb=shearRGB(shears[fi]);
+      else if(mode==='hshear') rgb=hshearRGB(calcHorizShear(li2,oi2,hpa));
+      else if(mode==='temp')   rgb=tempRGB(t);
+      else {
+        const fi2=fi<N_FL-1?fi+1:fi-1, sign=fi<N_FL-1?1:-1;
+        const dz=Math.abs(FLS[fi2].km-FLS[fi].km);
+        rgb=teGradRGB(sign*(tes[fi2]-tes[fi])/dz);
+      }
+      if(rgb[0]+rgb[1]+rgb[2]<0.015) return;
+      const brt=3.5;
+      ctx.fillStyle=`rgb(${Math.min(255,rgb[0]*brt*255|0)},${Math.min(255,rgb[1]*brt*255|0)},${Math.min(255,rgb[2]*brt*255|0)})`;
+      ctx.fillRect(ML+xi*cellW, MT+(N_FL-1-fi)*cellH, cellW+.5, cellH+.5);
+    });
+  });
+
+  // グリッド線
+  ctx.strokeStyle='rgba(40,70,120,.5)'; ctx.lineWidth=.7; ctx.setLineDash([3,3]);
+  FLS.forEach((_,fi)=>{
+    const y=MT+(N_FL-1-fi)*cellH;
+    ctx.beginPath(); ctx.moveTo(ML,y); ctx.lineTo(ML+aW,y); ctx.stroke();
+  });
+  pts.forEach((_,xi)=>{
+    const x=ML+xi*cellW;
+    ctx.beginPath(); ctx.moveTo(x,MT); ctx.lineTo(x,MT+aH); ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  // 矢羽
+  const barbSz = Math.min(cellW, cellH) * 0.42;
+  pts.forEach(({pi},xi)=>{
+    const d=wxData[pi]; if(!d) return;
+    FLS.forEach(({hpa},fi)=>{
+      const spd=d[hpa]?.w??0; if(spd<2.5) return;
+      const dir=d[hpa]?.dir??0;
+      const cx=ML+(xi+.5)*cellW;
+      const cy=MT+(N_FL-1-fi)*cellH+cellH*0.5;
+      drawWindBarb(ctx,cx,cy,spd,dir,barbSz);
+    });
+  });
+
+  // 赤道ライン (南北断面のみ)
+  if(xAxis==='lon'){
+    const eqIdx = GRID_LATS.findIndex(la=>la>=0);
+    if(eqIdx>0){
+      const eqX = ML+(eqIdx-.5)*cellW;
+      ctx.strokeStyle='rgba(80,180,100,.6)'; ctx.lineWidth=1.2; ctx.setLineDash([4,3]);
+      ctx.beginPath(); ctx.moveTo(eqX,MT); ctx.lineTo(eqX,MT+aH); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle='rgba(80,180,100,.8)'; ctx.font='9px monospace'; ctx.textAlign='center';
+      ctx.fillText('EQ',eqX,MT+aH+12);
+    }
+  }
+
+  // 圏界面マーカー
+  ctx.fillStyle='#ff3333';
+  pts.forEach(({pi},xi)=>{
+    const d=wxData[pi]; if(!d) return;
+    const temps=FLS.map(({hpa:h})=>d[h]?.t??-50);
+    const ti=findTropo(temps);
+    if(ti>=N_FL-0.05) return;
+    const ty=MT+(N_FL-1-ti)*cellH;
+    const r=Math.max(4, Math.min(8, cellW*0.35));
+    ctx.beginPath(); ctx.arc(ML+(xi+.5)*cellW, ty, r, 0, Math.PI*2); ctx.fill();
+  });
+
+  // 軸ラベル
+  const fs=Math.max(9, Math.min(12, cW/60));
+  ctx.font=`${fs}px monospace`; ctx.fillStyle='#8b949e';
+  ctx.textAlign='right';
+  FLS.forEach(({label},fi)=>{
+    const y=MT+(N_FL-1-fi)*cellH+cellH*.5+fs*.35;
+    ctx.fillText(label, ML-5, y);
+  });
+  ctx.textAlign='left';
+  FLS.forEach(({hpa},fi)=>{
+    const y=MT+(N_FL-1-fi)*cellH+cellH*.5+fs*.35;
+    ctx.fillText(hpa, ML+aW+5, y);
+  });
+  ctx.textAlign='center';
+  pts.forEach(({key},xi)=>{
+    ctx.fillText(key, ML+(xi+.5)*cellW, MT+aH+fs+4);
+  });
+  ctx.fillStyle='rgba(88,166,255,.7)';
+  ctx.fillText(xAxis==='lon'?'緯度 →':'経度 →', ML+aW/2, cH-4);
+  ctx.save(); ctx.translate(10,MT+aH/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center'; ctx.fillText('FL ↑',0,0); ctx.restore();
+  ctx.fillStyle='rgba(88,166,255,.55)'; ctx.textAlign='left';
+  ctx.fillText('hPa',ML+aW+5, MT-6);
+
+  // 枠線 & タイトル
+  ctx.strokeStyle='rgba(80,120,180,.6)'; ctx.lineWidth=1;
+  ctx.strokeRect(ML,MT,aW,aH);
+  const now=new Date();
+  const fixedLabel = xAxis==='lon'
+    ? `${GRID_LONS[xIdx]}°E固定`
+    : (()=>{const l=GRID_LATS[xIdx]; return l>=0?`${l}°N固定`:`${Math.abs(l)}°S固定`;})();
+  ctx.textAlign='center';
+  ctx.font=`bold ${Math.max(12,cW/55)}px -apple-system,sans-serif`;
+  ctx.fillStyle='#e6edf3';
+  ctx.fillText(`断面図  ${fixedLabel}  ${now.getFullYear()%100}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:00 JST`, cW/2, 26);
+  ctx.font=`${fs-1}px monospace`;
+  ctx.textAlign='right';
+  ctx.fillStyle='rgba(255,80,80,.9)';
+  ctx.fillText('● TROP（圏界面）', ML+aW, MT-8);
+  ctx.fillStyle='rgba(200,200,200,.65)';
+  ctx.fillText('矢羽: 短1本=5kt  長1本=10kt  ▷=50kt', ML+aW, MT-20);
+  if(mode==='te'){
+    ctx.textAlign='left';
+    ctx.fillStyle='rgba(255,0,0,.85)';   ctx.fillText('■不安定(∂θe/∂z<0)', ML, MT-20);
+    ctx.fillStyle='rgba(50,150,255,.85)'; ctx.fillText('  ■安定(>0)', ML+120, MT-20);
+  }
+}
+
+// ── resize ──────────────────────────────────────────────────────
+window.addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight); lrender.setSize(innerWidth,innerHeight);
+  if(document.getElementById('x-panel')?.style.display!=='none') drawXSection();
+});
+
+// ── loop ────────────────────────────────────────────────────────
+(function loop(){
+  requestAnimationFrame(loop); ctrl.update();
+  renderer.render(scene,camera); lrender.render(scene,camera);
+})();
+
+// ── init ────────────────────────────────────────────────────────
+renderLegend('shear');
+buildVoxels();
+fetchWX();
+</script>
+</body>
+</html>
