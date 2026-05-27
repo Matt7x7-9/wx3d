@@ -964,6 +964,72 @@ window.gotoView = k => {
   })(t0);
 };
 
+// ── θe等値線 (marching squares) ─────────────────────────────────
+function drawThetaEContours(ctx, teGrid, N, cellW, cellH, ML, MT) {
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.font = 'bold 9px monospace';
+
+  const cxF = xi => ML + (xi + 0.5) * cellW;
+  const cyF = fi => MT + (N_FL - 0.5 - fi) * cellH;
+
+  for (let target = 285; target <= 365; target += 5) {
+    const major = (target % 10 === 0);
+    ctx.strokeStyle = major ? 'rgba(255,250,160,0.80)' : 'rgba(255,250,160,0.35)';
+    ctx.lineWidth   = major ? 1.4 : 0.7;
+
+    ctx.beginPath();
+    let labelPt = null;
+
+    for (let xi = 0; xi < N-1; xi++) {
+      for (let fi = 0; fi < N_FL-1; fi++) {
+        const v00=teGrid[xi]?.[fi], v10=teGrid[xi+1]?.[fi];
+        const v11=teGrid[xi+1]?.[fi+1], v01=teGrid[xi]?.[fi+1];
+        if (v00==null||v10==null||v11==null||v01==null) continue;
+
+        const p0x=cxF(xi), p1x=cxF(xi+1);
+        const p0y=cyF(fi), p1y=cyF(fi+1); // p1y < p0y (上の方が小さい)
+        const edges=[];
+
+        if ((v00-target)*(v10-target)<0) { // bottom
+          const t=(target-v00)/(v10-v00); edges.push([p0x+t*(p1x-p0x), p0y]);
+        }
+        if ((v10-target)*(v11-target)<0) { // right
+          const t=(target-v10)/(v11-v10); edges.push([p1x, p0y+t*(p1y-p0y)]);
+        }
+        if ((v11-target)*(v01-target)<0) { // top
+          const t=(target-v11)/(v01-v11); edges.push([p1x+t*(p0x-p1x), p1y]);
+        }
+        if ((v01-target)*(v00-target)<0) { // left
+          const t=(target-v01)/(v00-v01); edges.push([p0x, p1y+t*(p0y-p1y)]);
+        }
+
+        if (edges.length >= 2) {
+          ctx.moveTo(edges[0][0], edges[0][1]);
+          ctx.lineTo(edges[1][0], edges[1][1]);
+          if (edges.length === 4) { ctx.moveTo(edges[2][0], edges[2][1]); ctx.lineTo(edges[3][0], edges[3][1]); }
+          // ラベル候補: 最右端の点
+          for (const [ex,ey] of edges) { if (!labelPt || ex > labelPt[0]) labelPt=[ex,ey]; }
+        }
+      }
+    }
+    ctx.stroke();
+
+    // 10K毎にラベル
+    if (major && labelPt) {
+      const [lx,ly] = labelPt;
+      const txt = `${target}`;
+      const tw = ctx.measureText(txt).width;
+      ctx.fillStyle = 'rgba(6,11,18,0.75)';
+      ctx.fillRect(lx-tw/2-2, ly-6, tw+4, 13);
+      ctx.fillStyle = 'rgba(255,250,160,0.95)';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(txt, lx, ly);
+    }
+  }
+  ctx.restore();
+}
+
 // ── 断面図 (cross-section) ───────────────────────────────────────
 // E140 = GRID_LONS[14]=140, N36 = GRID_LATS[10]=36
 let xAxis='lon', lonIdx=14, latIdx=10;
@@ -1050,6 +1116,19 @@ function drawXSection(){
     ctx.beginPath(); ctx.moveTo(x,MT); ctx.lineTo(x,MT+aH); ctx.stroke();
   });
   ctx.setLineDash([]);
+
+  // ── θe等値線 ────────────────────────────────────────────────
+  if (mode === 'te') {
+    const teGrid = pts.map(({pi}) => {
+      const d = wxData[pi];
+      if (!d) return Array(N_FL).fill(null);
+      return FLS.map(({hpa}) => {
+        const {t,rh} = d[hpa] ?? {t:-50, rh:50};
+        return calcThetaE(t, hpa, rh);
+      });
+    });
+    drawThetaEContours(ctx, teGrid, N, cellW, cellH, ML, MT);
+  }
 
   // ── 矢羽 ────────────────────────────────────────────────────
   const barbSz = Math.min(cellW, cellH) * 0.323; // さらに15%小さく
