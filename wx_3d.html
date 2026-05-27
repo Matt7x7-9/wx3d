@@ -963,10 +963,13 @@ window.gotoView = k => {
 };
 
 // ── 断面図 (cross-section) ───────────────────────────────────────
-let xAxis='lon', xIdx=1; // default: 127°E
+// E140 = GRID_LONS[14]=140, N36 = GRID_LATS[10]=36
+let xAxis='lon', lonIdx=14, latIdx=10;
+let xIdx=lonIdx;
 
 window.openXSec = axis => {
   xAxis=axis;
+  xIdx = axis==='lon' ? lonIdx : latIdx;
   document.getElementById('x-panel').style.display='flex';
   document.getElementById('x-slider').max = (axis==='lon'?N_LON:N_LAT)-1;
   document.getElementById('x-slider').value = xIdx;
@@ -976,7 +979,7 @@ window.openXSec = axis => {
 };
 window.closeXSec = ()=>{ document.getElementById('x-panel').style.display='none'; };
 window.setXAxis  = axis=>window.openXSec(axis);
-window.onXSlider = v=>{ xIdx=+v; updateXVal(); drawXSection(); };
+window.onXSlider = v=>{ xIdx=+v; if(xAxis==='lon') lonIdx=xIdx; else latIdx=xIdx; updateXVal(); drawXSection(); };
 
 function updateXVal(){
   const v=xAxis==='lon'?`${GRID_LONS[xIdx]}°E`:`${GRID_LATS[xIdx]}°N`;
@@ -997,8 +1000,9 @@ function drawXSection(){
   const aW=cW-ML-MR, aH=cH-MT-MB;
 
   // スライスする格子点列
+  // 南北断面: 左=高緯度(北)、右=低緯度(南) → reverse
   const pts=(xAxis==='lon')
-    ?GRID_LATS.map((lat,li)=>({key:lat+'N',pi:li*N_LON+xIdx}))
+    ?GRID_LATS.map((lat,li)=>({key:lat+'N',pi:li*N_LON+xIdx})).reverse()
     :GRID_LONS.map((lon,oi)=>({key:lon+'E',pi:xIdx*N_LON+oi}));
   const N=pts.length;
   const cellW=aW/N, cellH=aH/N_FL;
@@ -1026,8 +1030,8 @@ function drawXSection(){
         rgb=teGradRGB(sign*(tes[fi2]-tes[fi])/dz);
       }
       if(rgb[0]+rgb[1]+rgb[2]<0.015) return;
-      const brt=3.5; // 断面図はキャンバス2Dなので常にブースト
-      ctx.fillStyle=`rgb(${Math.min(255,rgb[0]*brt*255|0)},${Math.min(255,rgb[1]*brt*255|0)},${Math.min(255,rgb[2]*brt*255|0)})`;
+      const brt=2.0; // 断面図ブースト（薄め）
+      ctx.fillStyle=`rgba(${Math.min(255,rgb[0]*brt*255|0)},${Math.min(255,rgb[1]*brt*255|0)},${Math.min(255,rgb[2]*brt*255|0)},0.72)`;
       ctx.fillRect(ML+xi*cellW, MT+(N_FL-1-fi)*cellH, cellW+.5, cellH+.5);
     });
   });
@@ -1091,7 +1095,7 @@ function drawXSection(){
   });
   // 軸タイトル
   ctx.fillStyle='rgba(88,166,255,.7)';
-  ctx.fillText(xAxis==='lon'?'緯度 →':'経度 →', ML+aW/2, cH-4);
+  ctx.fillText(xAxis==='lon'?'← 北（高緯度）　南（低緯度） →':'経度 →', ML+aW/2, cH-4);
   ctx.save(); ctx.translate(10,MT+aH/2); ctx.rotate(-Math.PI/2);
   ctx.textAlign='center'; ctx.fillText('FL ↑',0,0); ctx.restore();
   ctx.fillStyle='rgba(88,166,255,.55)'; ctx.textAlign='left';
