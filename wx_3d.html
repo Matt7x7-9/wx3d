@@ -1117,8 +1117,8 @@ function drawXSection(){
   });
   ctx.setLineDash([]);
 
-  // ── θe等値線 ────────────────────────────────────────────────
-  if (mode === 'te') {
+  // ── θe等値線 (断面図では常時表示) ───────────────────────────
+  {
     const teGrid = pts.map(({pi}) => {
       const d = wxData[pi];
       if (!d) return Array(N_FL).fill(null);
