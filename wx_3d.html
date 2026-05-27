@@ -110,7 +110,7 @@ canvas { display: block; }
 }
 .xc-btn.on { background: rgba(88,166,255,.15); color: #58a6ff; border-color: rgba(88,166,255,.4); }
 #x-val { font-size: 14px; color: #58a6ff; min-width: 50px; text-align: center; font-weight: 700; }
-#x-slider { flex: 1; min-width: 92px; max-width: 253px; accent-color: #58a6ff; }
+#x-slider { flex: 1; min-width: 120px; max-width: 329px; accent-color: #58a6ff; }
 #x-canvas { flex: 1; width: 100%; display: block; order: 1; }
 </style>
 </head>
@@ -175,8 +175,10 @@ canvas { display: block; }
     <span id="x-title">断面図</span>
     <button class="xc-btn on" id="xb-lon" onclick="setXAxis('lon')">南北（経度固定）</button>
     <button class="xc-btn"    id="xb-lat" onclick="setXAxis('lat')">東西（緯度固定）</button>
-    <span id="x-val">127°E</span>
-    <input type="range" id="x-slider" min="0" max="18" value="1" oninput="onXSlider(this.value)">
+    <span id="x-val">140°E</span>
+    <button class="xc-btn" onclick="stepXSlider(-1)">◀</button>
+    <input type="range" id="x-slider" min="0" max="18" value="14" oninput="onXSlider(this.value)">
+    <button class="xc-btn" onclick="stepXSlider(1)">▶</button>
     <button class="xc-btn" onclick="closeXSec()">✕ 閉じる</button>
   </div>
   <canvas id="x-canvas"></canvas>
@@ -980,6 +982,7 @@ window.openXSec = axis => {
 window.closeXSec = ()=>{ document.getElementById('x-panel').style.display='none'; };
 window.setXAxis  = axis=>window.openXSec(axis);
 window.onXSlider = v=>{ xIdx=+v; if(xAxis==='lon') lonIdx=xIdx; else latIdx=xIdx; updateXVal(); drawXSection(); };
+window.stepXSlider = d=>{ const sl=document.getElementById('x-slider'); xIdx=Math.max(0,Math.min(+sl.max,xIdx+d)); sl.value=xIdx; if(xAxis==='lon') lonIdx=xIdx; else latIdx=xIdx; updateXVal(); drawXSection(); };
 
 function updateXVal(){
   const v=xAxis==='lon'?`${GRID_LONS[xIdx]}°E`:`${GRID_LATS[xIdx]}°N`;
