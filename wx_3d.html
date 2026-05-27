@@ -1049,7 +1049,7 @@ function drawXSection(){
   ctx.setLineDash([]);
 
   // ── 矢羽 ────────────────────────────────────────────────────
-  const barbSz = Math.min(cellW, cellH) * 0.38; // 10%小さく
+  const barbSz = Math.min(cellW, cellH) * 0.323; // さらに15%小さく
   pts.forEach(({pi},xi)=>{
     const d=wxData[pi]; if(!d) return;
     FLS.forEach(({hpa},fi)=>{
